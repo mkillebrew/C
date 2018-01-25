@@ -55,10 +55,10 @@ unsigned int rand_range(int min_n, int max_n)
 
 int main(int argc, char *argv[]){
         time_t t;
-        int i, x, alnum, opt;
+        int i, x, alnum, opt, phash;
         char plaintext[21], salt[21]="$6$";
 
-	alnum=0;
+	alnum,phash=0;
 	bzero(plaintext, 21);
 
 	if(RAND_load_file("/dev/urandom", 32) != 32) {
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]){
 		return 1;
 	}
 
-	while ((opt = getopt(argc, argv, "nah")) != -1) {
+	while ((opt = getopt(argc, argv, "cnah")) != -1) {
 		switch (opt) {                                                                                                                                                                                                                
 			case 'n':
 				alnum=1;
@@ -74,9 +74,12 @@ int main(int argc, char *argv[]){
 			case 'a':
 				alnum=0;
 				break;
+			case 'c':
+				phash=1;
+				break;
 			case 'h':
 			default:
-				fprintf(stderr, "Usage: %s -a (all printable) || -n (alpha-numeric)\n", argv[0]);
+				fprintf(stderr, "Usage: %s -a (all printable) || -n (alpha-numeric), -c (print hash)\n", argv[0]);
 				exit(EXIT_FAILURE);
 		}
 	}
@@ -113,7 +116,11 @@ int main(int argc, char *argv[]){
 	salt[19]='$';
 	salt[20]='\0';
 
-        printf("%s\n", crypt((char*) plaintext, (char*) salt));
+	if(phash){
+        	printf("%s\n", crypt((char*) plaintext, (char*) salt));
+	} else {
+		printf("\n");
+	}
 
         return 0;
 }
